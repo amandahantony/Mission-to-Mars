@@ -4,25 +4,27 @@ from bs4 import BeautifulSoup as soup
 import pandas as pd
 import datetime as dt
 
-
 def scrape_all():
     # Initiate headless driver for deployment
     browser = Browser("chrome", executable_path="chromedriver", headless=True)
 
     news_title, news_paragraph = mars_news(browser)
-
+    hemisphere_image_urls = hemisphere(browser)
+    
     # Run all scraping functions and store results in a dictionary
     data = {
         "news_title": news_title,
         "news_paragraph": news_paragraph,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
+        "hemispheres": hemisphere_image_urls,
         "last_modified": dt.datetime.now()
     }
 
     # Stop webdriver and return data
     browser.quit()
     return data
+
 
 
 def mars_news(browser):
@@ -95,6 +97,37 @@ def mars_facts():
     # Convert dataframe into HTML format, add bootstrap
     return df.to_html(classes="table table-striped")
 
+def hemisphere(browser):
+
+    # 1. Use browser to visit the URL 
+    browser = Browser("chrome", executable_path="chromedriver", headless=True)
+    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    browser.visit(url)
+    html = browser.html
+    hemi_soup = soup(html, 'html.parser')
+    hemi_info = hemi_soup.find_all('div', class_='item')
+    base_url = 'https://astrogeology.usgs.gov'
+
+    hemisphere_image_urls = []
+    for info in hemi_info: 
+        #Get title of hemisphere
+        title = info.find('h3').get_text()
+        #Navigate to hemisphere pages from base page
+        img_url_rel = info.find('a')['href']
+        hemi_url = base_url + img_url_rel
+        browser.visit(hemi_url)
+        #Parse hemisphere pages
+        html = browser.html
+        img_soup = soup(html, 'html.parser')
+        url_info = img_soup.find('div', class_='downloads')
+        img_url = url_info.find('a')['href']
+    
+        hemispheres = {'img_url': img_url, 'title': title}
+        hemisphere_image_urls.append(hemispheres)
+
+    return hemisphere_image_urls    
+
+    
 if __name__ == "__main__":
 
     # If running as script, print scraped data
